@@ -1,0 +1,43 @@
+# Captured 2026-11-19 04:45 (UTC). Account identifiers are redacted.
+
+$ az ad app federated-credential list --id "$APPID" --query "[].{name:name,issuer:issuer,subject:subject,audience:audiences[0]}" -o jsonc
+[
+  {
+    "audience": "api://AzureADTokenExchange",
+    "issuer": "https://token.actions.githubusercontent.com",
+    "name": "gh-azure-hub-spoke-landing-zone",
+    "subject": "repo:mohamedhirey@287526363/azure-hub-spoke-landing-zone@1463669897:environment:production"
+  }
+]
+
+$ az ad app show --id "$APPID" --query "{displayName:displayName,clientSecrets:length(passwordCredentials),certificates:length(keyCredentials),graphPermissions:length(requiredResourceAccess)}" -o jsonc
+{
+  "certificates": 0,
+  "clientSecrets": 0,
+  "displayName": "gh-azure-hub-spoke-landing-zone",
+  "graphPermissions": 0
+}
+
+$ az role assignment list --assignee "$SPOID" --all --query "[].{Role:roleDefinitionName,Scope:scope}" -o table    # everything the pipeline identity can do
+Role                           Scope
+-----------------------------  -----------------------------------------------------------------------------------------------------------------------------------------------
+Network Contributor            /subscriptions/<subscription-id>/resourceGroups/rg-lz-workload-cac-001
+Storage Blob Data Contributor  /subscriptions/<subscription-id>/resourceGroups/rg-lz-state-cac-001/providers/Microsoft.Storage/storageAccounts/stlz<redacted>
+
+$ gh api repos/mohamedhirey/azure-hub-spoke-landing-zone/environments/production --jq "{environment: .name, protection_rules: [.protection_rules[] | {type, reviewers: [.reviewers[]?.reviewer.login]}]}"
+{"environment":"production","protection_rules":[{"reviewers":["mohamedhirey"],"type":"required_reviewers"}]}
+
+$ gh api repos/mohamedhirey/azure-hub-spoke-landing-zone/branches/main/protection --jq "{required_checks: [.required_status_checks.checks[].context], pull_request_required: (.required_pull_request_reviews != null)}"
+{"pull_request_required":true,"required_checks":["Validate and scan"]}
+
+$ gh api repos/mohamedhirey/azure-hub-spoke-landing-zone/actions/permissions/workflow --jq .default_workflow_permissions    # default token permission for workflows
+read
+
+$ gh secret list -R mohamedhirey/azure-hub-spoke-landing-zone --json name --jq ".[].name"    # identifiers only - none of these is a credential
+AZURE_CLIENT_ID
+AZURE_SUBSCRIPTION_ID
+AZURE_TENANT_ID
+TFSTATE_RG
+TFSTATE_STORAGE_ACCOUNT
+WORKLOAD_RG
+

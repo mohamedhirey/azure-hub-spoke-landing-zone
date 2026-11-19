@@ -9,6 +9,9 @@
 
 A production-shaped Azure network landing zone: hub-and-spoke topology, default-deny network security groups, remote state that no storage account key can open, and a secretless OIDC deployment pipeline. Built with Terraform. Every deployment is verified against live Azure and torn down in the same session.
 
+> **Evidence status:** Deployed and verified on 19 November 2026 (UTC), then removed. No Azure resource remains.
+> The pipeline in this repository did all three: [plan](https://github.com/mohamedhirey/azure-hub-spoke-landing-zone/actions/runs/44460878382) · [apply](https://github.com/mohamedhirey/azure-hub-spoke-landing-zone/actions/runs/44461006767) · [destroy](https://github.com/mohamedhirey/azure-hub-spoke-landing-zone/actions/runs/44461612790). The captured proof is in [`docs/evidence/`](docs/evidence/README.md).
+
 **Author:** Mohamed Hirey — Azure Cloud Engineer · [linkedin.com/in/mohamedhirey](https://linkedin.com/in/mohamedhirey)
 
 Companion project: [**Azure Secure Web App**](https://github.com/mohamedhirey/azure-secure-web-app) covers what runs on top of a network like this one: platform services, managed identity, private connectivity and monitoring.
@@ -89,6 +92,23 @@ sequenceDiagram
     Gate->>Azure: Read back NSG rules and resource inventory
     Note over Gate,Azure: Asserts DenyAllInbound at 4096 on every NSG<br/>and that no billable resource exists
 ```
+
+---
+
+## Evidence
+
+Deployed to a real subscription on 19 November 2026 (UTC), verified, and removed. Full index: [`docs/evidence/`](docs/evidence/README.md).
+
+![The apply run: approved at the production gate, job green](docs/evidence/pipeline-apply-run.png)
+
+| Claim | Proof |
+|---|---|
+| The pipeline signs in with no secret | The [apply run](https://github.com/mohamedhirey/azure-hub-spoke-landing-zone/actions/runs/44461006767) log prints the federated token's subject and `Azure CLI login succeeds by using OIDC`. The app registration held 0 client secrets: [`02-identity-oidc.txt`](docs/evidence/02-identity-oidc.txt) |
+| State cannot be read with an account key | Refused with `KeyBasedAuthenticationNotPermitted`: [`03-keyless-remote-state.txt`](docs/evidence/03-keyless-remote-state.txt) |
+| Every NSG fails closed | `DenyAllInbound` at 4096 on all four, read back from Azure: [`06-live-azure-verification.txt`](docs/evidence/06-live-azure-verification.txt) |
+| Dev cannot reach prod | Four peerings, all `Connected`, none between the spokes: [`06-live-azure-verification.txt`](docs/evidence/06-live-azure-verification.txt) |
+| The tests can fail | Break the rule, watch 2 of 4 fail, restore: [`01-unit-tests.txt`](docs/evidence/01-unit-tests.txt) |
+| Nothing was left behind | 0 resources, roles, app registrations or secrets: [`07-teardown.txt`](docs/evidence/07-teardown.txt) |
 
 ---
 

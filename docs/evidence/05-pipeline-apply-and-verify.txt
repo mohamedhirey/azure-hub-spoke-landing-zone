@@ -1,0 +1,90 @@
+# GitHub Actions run: azure-lifecycle, action = apply
+# https://github.com/mohamedhirey/azure-hub-spoke-landing-zone/actions/runs/44461006767
+# Condensed from the run log. GitHub masks the stored identifiers as ***.
+
+== Step outcomes ==
+skipped  Confirm the action
+success  Run actions/checkout@v4
+success  Run hashicorp/setup-terraform@v3
+success  Azure login (OIDC, no client secret)
+success  Unit tests
+success  Terraform init
+skipped  Plan
+success  Apply
+skipped  Destroy
+success  Verify NSG posture from live Azure
+success  Confirm no billable resource was created
+
+== Azure login (OIDC, no client secret)  [2026-11-19 04:50:20 UTC] ==
+  client-id: ***
+  tenant-id: ***
+  subscription-id: ***
+  auth-type: SERVICE_PRINCIPAL
+  ARM_USE_OIDC: true
+Federated token details:
+ issuer - https://token.actions.githubusercontent.com
+ subject claim - repo:mohamedhirey@287526363/azure-hub-spoke-landing-zone@1463669897:environment:production
+ audience - api://AzureADTokenExchange
+ job_workflow_ref - mohamedhirey/azure-hub-spoke-landing-zone/.github/workflows/azure-lifecycle.yml@refs/heads/main
+Attempting Azure CLI login by using OIDC...
+Azure CLI login succeeds by using OIDC.
+
+== Unit tests ==
+  run "catch_all_deny_sits_at_the_maximum_priority"... pass
+  run "allows_are_evaluated_before_the_catch_all"... pass
+  run "optional_rule_is_omitted_when_no_source_is_given"... pass
+  run "rejects_a_tier_rule_that_would_be_unreachable"... pass
+tests/rule_order.tftest.hcl... pass
+Success! 4 passed, 0 failed.
+
+== Terraform init ==
+  -backend-config="resource_group_name=***" \
+  -backend-config="storage_account_name=***" \
+  -backend-config="container_name=tfstate" \
+  -backend-config="key=lz.tfstate"
+Initializing the backend...
+Successfully configured the backend "azurerm"! Terraform will automatically
+Terraform has been successfully initialized!
+
+== Apply  [2026-11-19 04:50:32 UTC] ==
+module.spoke_nsg["prod-snet-app"].azurerm_network_security_group.this: Creation complete after 3s [id=/subscriptions/***/resourceGroups/***/providers/Microsoft.Network/networkSecurityGroups/nsg-lz-prod-snet-app-cac-001]
+module.spoke_nsg["dev-snet-app"].azurerm_network_security_group.this: Creation complete after 4s [id=/subscriptions/***/resourceGroups/***/providers/Microsoft.Network/networkSecurityGroups/nsg-lz-dev-snet-app-cac-001]
+module.hub_nsg.azurerm_network_security_group.this: Creation complete after 4s [id=/subscriptions/***/resourceGroups/***/providers/Microsoft.Network/networkSecurityGroups/nsg-lz-hub-cac-001]
+module.spoke_nsg["dev-snet-web"].azurerm_network_security_group.this: Creation complete after 4s [id=/subscriptions/***/resourceGroups/***/providers/Microsoft.Network/networkSecurityGroups/nsg-lz-dev-snet-web-cac-001]
+module.hub_nsg.azurerm_network_security_rule.deny_all_inbound: Creation complete after 2s [id=/subscriptions/***/resourceGroups/***/providers/Microsoft.Network/networkSecurityGroups/nsg-lz-hub-cac-001/securityRules/DenyAllInbound]
+module.spoke["dev"].azurerm_virtual_network.this: Creation complete after 6s [id=/subscriptions/***/resourceGroups/***/providers/Microsoft.Network/virtualNetworks/vnet-lz-dev-cac-001]
+module.hub.azurerm_virtual_network.this: Creation complete after 6s [id=/subscriptions/***/resourceGroups/***/providers/Microsoft.Network/virtualNetworks/vnet-lz-hub-cac-001]
+module.spoke["prod"].azurerm_virtual_network.this: Creation complete after 6s [id=/subscriptions/***/resourceGroups/***/providers/Microsoft.Network/virtualNetworks/vnet-lz-prod-cac-001]
+module.spoke_nsg["dev-snet-web"].azurerm_network_security_rule.deny_all_inbound: Creation complete after 3s [id=/subscriptions/***/resourceGroups/***/providers/Microsoft.Network/networkSecurityGroups/nsg-lz-dev-snet-web-cac-001/securityRules/DenyAllInbound]
+module.spoke_nsg["dev-snet-app"].azurerm_network_security_rule.tier["AllowAppFromWebTier"]: Creation complete after 3s [id=/subscriptions/***/resourceGroups/***/providers/Microsoft.Network/networkSecurityGroups/nsg-lz-dev-snet-app-cac-001/securityRules/AllowAppFromWebTier]
+module.spoke_nsg["dev-snet-app"].azurerm_network_security_rule.deny_all_inbound: Creation complete after 4s [id=/subscriptions/***/resourceGroups/***/providers/Microsoft.Network/networkSecurityGroups/nsg-lz-dev-snet-app-cac-001/securityRules/DenyAllInbound]
+module.spoke_nsg["prod-snet-app"].azurerm_network_security_rule.deny_all_inbound: Creation complete after 4s [id=/subscriptions/***/resourceGroups/***/providers/Microsoft.Network/networkSecurityGroups/nsg-lz-prod-snet-app-cac-001/securityRules/DenyAllInbound]
+module.spoke_nsg["dev-snet-web"].azurerm_network_security_rule.tier["AllowHttpsFromVnet"]: Creation complete after 4s [id=/subscriptions/***/resourceGroups/***/providers/Microsoft.Network/networkSecurityGroups/nsg-lz-dev-snet-web-cac-001/securityRules/AllowHttpsFromVnet]
+module.hub_nsg.azurerm_network_security_rule.allow_from_hub[0]: Creation complete after 4s [id=/subscriptions/***/resourceGroups/***/providers/Microsoft.Network/networkSecurityGroups/nsg-lz-hub-cac-001/securityRules/AllowFromHub]
+module.spoke_nsg["prod-snet-app"].azurerm_network_security_rule.allow_from_hub[0]: Creation complete after 2s [id=/subscriptions/***/resourceGroups/***/providers/Microsoft.Network/networkSecurityGroups/nsg-lz-prod-snet-app-cac-001/securityRules/AllowFromHub]
+module.spoke_nsg["dev-snet-app"].azurerm_network_security_rule.allow_from_hub[0]: Creation complete after 3s [id=/subscriptions/***/resourceGroups/***/providers/Microsoft.Network/networkSecurityGroups/nsg-lz-dev-snet-app-cac-001/securityRules/AllowFromHub]
+module.spoke_nsg["dev-snet-web"].azurerm_network_security_rule.allow_from_hub[0]: Creation complete after 4s [id=/subscriptions/***/resourceGroups/***/providers/Microsoft.Network/networkSecurityGroups/nsg-lz-dev-snet-web-cac-001/securityRules/AllowFromHub]
+module.hub.azurerm_subnet.this["snet-shared"]: Creation complete after 6s [id=/subscriptions/***/resourceGroups/***/providers/Microsoft.Network/virtualNetworks/vnet-lz-hub-cac-001/subnets/snet-shared]
+module.spoke["dev"].azurerm_subnet.this["snet-app"]: Creation complete after 5s [id=/subscriptions/***/resourceGroups/***/providers/Microsoft.Network/virtualNetworks/vnet-lz-dev-cac-001/subnets/snet-app]
+module.spoke["prod"].azurerm_subnet.this["snet-app"]: Creation complete after 5s [id=/subscriptions/***/resourceGroups/***/providers/Microsoft.Network/virtualNetworks/vnet-lz-prod-cac-001/subnets/snet-app]
+azurerm_subnet_network_security_group_association.hub["snet-shared"]: Creation complete after 5s [id=/subscriptions/***/resourceGroups/***/providers/Microsoft.Network/virtualNetworks/vnet-lz-hub-cac-001/subnets/snet-shared]
+module.spoke["dev"].azurerm_subnet.this["snet-web"]: Creation complete after 9s [id=/subscriptions/***/resourceGroups/***/providers/Microsoft.Network/virtualNetworks/vnet-lz-dev-cac-001/subnets/snet-web]
+azurerm_subnet_network_security_group_association.spoke["dev-snet-app"]: Creation complete after 5s [id=/subscriptions/***/resourceGroups/***/providers/Microsoft.Network/virtualNetworks/vnet-lz-dev-cac-001/subnets/snet-app]
+azurerm_subnet_network_security_group_association.spoke["prod-snet-app"]: Creation complete after 6s [id=/subscriptions/***/resourceGroups/***/providers/Microsoft.Network/virtualNetworks/vnet-lz-prod-cac-001/subnets/snet-app]
+module.peering["prod"].azurerm_virtual_network_peering.reverse: Creation complete after 32s [id=/subscriptions/***/resourceGroups/***/providers/Microsoft.Network/virtualNetworks/vnet-lz-prod-cac-001/virtualNetworkPeerings/vnet-lz-prod-cac-001-to-vnet-lz-hub-cac-001]
+module.peering["prod"].azurerm_virtual_network_peering.forward: Creation complete after 58s [id=/subscriptions/***/resourceGroups/***/providers/Microsoft.Network/virtualNetworks/vnet-lz-hub-cac-001/virtualNetworkPeerings/vnet-lz-hub-cac-001-to-vnet-lz-prod-cac-001]
+module.peering["dev"].azurerm_virtual_network_peering.reverse: Creation complete after 1m24s [id=/subscriptions/***/resourceGroups/***/providers/Microsoft.Network/virtualNetworks/vnet-lz-dev-cac-001/virtualNetworkPeerings/vnet-lz-dev-cac-001-to-vnet-lz-hub-cac-001]
+azurerm_subnet_network_security_group_association.spoke["dev-snet-web"]: Creation complete after 1m29s [id=/subscriptions/***/resourceGroups/***/providers/Microsoft.Network/virtualNetworks/vnet-lz-dev-cac-001/subnets/snet-web]
+module.peering["dev"].azurerm_virtual_network_peering.forward: Creation complete after 1m55s [id=/subscriptions/***/resourceGroups/***/providers/Microsoft.Network/virtualNetworks/vnet-lz-hub-cac-001/virtualNetworkPeerings/vnet-lz-hub-cac-001-to-vnet-lz-dev-cac-001]
+Plan: 29 to add, 0 to change, 0 to destroy.
+Apply complete! Resources: 29 added, 0 changed, 0 destroyed.
+
+== Verify NSG posture from live Azure  [2026-11-19 04:52:48 UTC] ==
+OK   nsg-lz-dev-snet-app-cac-001
+OK   nsg-lz-dev-snet-web-cac-001
+OK   nsg-lz-hub-cac-001
+OK   nsg-lz-prod-snet-app-cac-001
+
+== Confirm no billable resource was created  [2026-11-19 04:53:02 UTC] ==
+OK   no VM, public IP, NAT gateway, firewall or VPN gateway present
+
