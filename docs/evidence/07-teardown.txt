@@ -1,0 +1,148 @@
+# Teardown, in the order GUIDE.md Step 21 prescribes. Captured 2026-11-19 04:58 (UTC).
+# Account identifiers are redacted.
+
+## 1. Workload destroyed through the pipeline that created it
+
+# GitHub Actions run: azure-lifecycle, action = destroy
+# https://github.com/mohamedhirey/azure-hub-spoke-landing-zone/actions/runs/44461612790
+
+== Step outcomes ==
+skipped  Confirm the action
+success  Run actions/checkout@v4
+success  Run hashicorp/setup-terraform@v3
+success  Azure login (OIDC, no client secret)
+success  Unit tests
+success  Terraform init
+skipped  Plan
+skipped  Apply
+success  Destroy
+skipped  Verify NSG posture from live Azure
+skipped  Confirm no billable resource was created
+
+== Azure login (OIDC, no client secret)  [2026-11-19 04:55:48 UTC] ==
+  client-id: ***
+  tenant-id: ***
+  subscription-id: ***
+  auth-type: SERVICE_PRINCIPAL
+  ARM_USE_OIDC: true
+Federated token details:
+ issuer - https://token.actions.githubusercontent.com
+ subject claim - repo:mohamedhirey@287526363/azure-hub-spoke-landing-zone@1463669897:environment:production
+ audience - api://AzureADTokenExchange
+ job_workflow_ref - mohamedhirey/azure-hub-spoke-landing-zone/.github/workflows/azure-lifecycle.yml@refs/heads/main
+Attempting Azure CLI login by using OIDC...
+Azure CLI login succeeds by using OIDC.
+
+== Unit tests ==
+  run "catch_all_deny_sits_at_the_maximum_priority"... pass
+  run "allows_are_evaluated_before_the_catch_all"... pass
+  run "optional_rule_is_omitted_when_no_source_is_given"... pass
+  run "rejects_a_tier_rule_that_would_be_unreachable"... pass
+tests/rule_order.tftest.hcl... pass
+Success! 4 passed, 0 failed.
+
+== Terraform init ==
+  -backend-config="resource_group_name=***" \
+  -backend-config="storage_account_name=***" \
+  -backend-config="container_name=tfstate" \
+  -backend-config="key=lz.tfstate"
+Initializing the backend...
+Successfully configured the backend "azurerm"! Terraform will automatically
+Terraform has been successfully initialized!
+
+== Destroy  [2026-11-19 04:56:09 UTC] ==
+module.hub_nsg.azurerm_network_security_rule.deny_all_inbound: Destruction complete after 2s
+module.hub_nsg.azurerm_network_security_rule.allow_from_hub[0]: Destruction complete after 3s
+module.peering["prod"].azurerm_virtual_network_peering.reverse: Destruction complete after 11s
+azurerm_subnet_network_security_group_association.spoke["prod-snet-app"]: Destruction complete after 15s
+module.peering["prod"].azurerm_virtual_network_peering.forward: Destruction complete after 27s
+module.peering["dev"].azurerm_virtual_network_peering.reverse: Destruction complete after 38s
+module.peering["dev"].azurerm_virtual_network_peering.forward: Destruction complete after 49s
+azurerm_subnet_network_security_group_association.hub["snet-shared"]: Destruction complete after 53s
+azurerm_subnet_network_security_group_association.spoke["dev-snet-app"]: Destruction complete after 53s
+module.hub_nsg.azurerm_network_security_group.this: Destruction complete after 2s
+azurerm_subnet_network_security_group_association.spoke["dev-snet-web"]: Destruction complete after 58s
+module.spoke_nsg["dev-snet-app"].azurerm_network_security_rule.tier["AllowAppFromWebTier"]: Destruction complete after 1s
+module.spoke_nsg["dev-snet-web"].azurerm_network_security_rule.tier["AllowHttpsFromVnet"]: Destruction complete after 2s
+module.spoke_nsg["dev-snet-web"].azurerm_network_security_rule.allow_from_hub[0]: Destruction complete after 2s
+module.spoke_nsg["dev-snet-web"].azurerm_network_security_rule.deny_all_inbound: Destruction complete after 2s
+module.spoke_nsg["prod-snet-app"].azurerm_network_security_rule.allow_from_hub[0]: Destruction complete after 2s
+module.spoke_nsg["dev-snet-app"].azurerm_network_security_rule.allow_from_hub[0]: Destruction complete after 3s
+module.spoke_nsg["prod-snet-app"].azurerm_network_security_rule.deny_all_inbound: Destruction complete after 3s
+module.spoke_nsg["dev-snet-app"].azurerm_network_security_rule.deny_all_inbound: Destruction complete after 3s
+module.spoke_nsg["prod-snet-app"].azurerm_network_security_group.this: Destruction complete after 1s
+module.spoke_nsg["dev-snet-web"].azurerm_network_security_group.this: Destruction complete after 2s
+module.spoke_nsg["dev-snet-app"].azurerm_network_security_group.this: Destruction complete after 2s
+module.hub.azurerm_subnet.this["snet-shared"]: Destruction complete after 11s
+module.spoke["prod"].azurerm_subnet.this["snet-app"]: Destruction complete after 10s
+module.spoke["dev"].azurerm_subnet.this["snet-app"]: Destruction complete after 11s
+module.hub.azurerm_virtual_network.this: Destruction complete after 11s
+module.spoke["prod"].azurerm_virtual_network.this: Destruction complete after 12s
+module.spoke["dev"].azurerm_subnet.this["snet-web"]: Destruction complete after 20s
+module.spoke["dev"].azurerm_virtual_network.this: Destruction complete after 12s
+Plan: 0 to add, 0 to change, 29 to destroy.
+Destroy complete! Resources: 29 destroyed.
+
+$ az resource list -g "$WLRG" --query "length(@)" -o tsv    # resources left in the workload group
+0
+
+## 2. Pipeline access and identity removed
+
+$ az role assignment delete --assignee "$SPOID" --scope "/subscriptions/$SUBID/resourceGroups/$WLRG" && az role assignment delete --assignee "$SPOID" --scope "$SAID" && az role assignment delete --assignee "$ME" --scope "$SAID" && echo "role assignments removed"
+role assignments removed
+
+$ az role assignment list --assignee "$SPOID" --all --query "length(@)" -o tsv    # roles the pipeline identity still holds
+0
+
+$ az ad app delete --id "$APPID" && echo "app registration deleted"
+app registration deleted
+
+$ az ad app list --display-name "gh-azure-hub-spoke-landing-zone" --query "length(@)" -o tsv    # app registrations left
+0
+
+## 3. Bootstrap last - it owns the state account and both resource groups
+
+$ terraform destroy        # in bootstrap/
+azurerm_storage_account.state: Destruction complete after 3s
+random_string.suffix: Destruction complete after 0s
+azurerm_resource_group.workload: Destruction complete after 27s
+azurerm_resource_group.state: Destruction complete after 27s
+Destroy complete! Resources: 4 destroyed.
+
+$ az group list --query "[?starts_with(name, 'rg-lz-')].name" -o tsv | wc -l    # rg-lz-* resource groups left
+0
+
+## 4. GitHub's stored identifiers removed
+
+$ for s in AZURE_CLIENT_ID AZURE_TENANT_ID AZURE_SUBSCRIPTION_ID TFSTATE_RG TFSTATE_STORAGE_ACCOUNT WORKLOAD_RG; do gh secret delete "$s" -R mohamedhirey/azure-hub-spoke-landing-zone; done; echo "secrets deleted"
+secrets deleted
+
+$ gh secret list -R mohamedhirey/azure-hub-spoke-landing-zone --json name --jq "length"    # repository secrets left
+0
+
+## 5. The whole subscription, not only this deployment's resource groups
+
+Two things outlive the four steps above, and neither belongs to this deployment. Azure creates a
+`NetworkWatcherRG` resource group by itself the first time a virtual network appears in a region,
+and `az ad app delete` only moves the app registration to the directory's recycle bin.
+
+$ az group list --query "[].{Name:name,Location:location}" -o table    # everything left in the subscription
+Name              Location
+----------------  -------------
+NetworkWatcherRG  canadacentral
+
+$ az group delete --name NetworkWatcherRG --yes && echo "NetworkWatcherRG removed"
+NetworkWatcherRG removed
+
+$ DELID=$(az rest --method get --url "https://graph.microsoft.com/v1.0/directory/deletedItems/microsoft.graph.application?\$select=id,displayName" --query "value[?displayName=='gh-azure-hub-spoke-landing-zone'].id | [0]" -o tsv); az rest --method delete --url "https://graph.microsoft.com/v1.0/directory/deletedItems/$DELID" && echo "app registration purged from the recycle bin"
+app registration purged from the recycle bin
+
+$ az group list --query "length(@)" -o tsv    # resource groups in the subscription
+0
+
+$ az resource list --query "length(@)" -o tsv    # resources in the subscription
+0
+
+$ az rest --method get --url "https://graph.microsoft.com/v1.0/directory/deletedItems/microsoft.graph.application?\$select=displayName" --query "length(value[?displayName=='gh-azure-hub-spoke-landing-zone'])" -o tsv    # this app registration, in the recycle bin
+0
+

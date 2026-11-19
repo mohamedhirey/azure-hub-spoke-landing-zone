@@ -1,0 +1,67 @@
+# Captured 2026-11-19 04:40 (UTC). Plan-only tests: nothing is created in Azure.
+# A test that has never been seen failing is not a test that can be trusted, so the
+# rule it guards is broken on purpose, the failure is observed, and the file is restored.
+
+$ terraform test        # modules/nsg, as written
+tests/rule_order.tftest.hcl... in progress
+  run "catch_all_deny_sits_at_the_maximum_priority"... pass
+  run "allows_are_evaluated_before_the_catch_all"... pass
+  run "optional_rule_is_omitted_when_no_source_is_given"... pass
+  run "rejects_a_tier_rule_that_would_be_unreachable"... pass
+tests/rule_order.tftest.hcl... tearing down
+tests/rule_order.tftest.hcl... pass
+
+Success! 4 passed, 0 failed.
+
+$ # break it on purpose: catch-all deny moved from priority 4096 to 100
+57:  priority                    = 4096
+$ terraform test        # expected to FAIL
+tests/rule_order.tftest.hcl... in progress
+  run "catch_all_deny_sits_at_the_maximum_priority"... fail
+
+Error: Test assertion failed
+
+  on tests/rule_order.tftest.hcl line 19, in run "catch_all_deny_sits_at_the_maximum_priority":
+  19:     condition     = azurerm_network_security_rule.deny_all_inbound.priority == 4096
+    ├────────────────
+    │ Diff:
+    │ --- actual
+    │ +++ expected
+    │ - 100
+    │ + 4096
+
+
+The catch-all deny must sit at 4096, the highest priority number Azure
+accepts, so it is evaluated last.
+  run "allows_are_evaluated_before_the_catch_all"... fail
+
+Error: Test assertion failed
+
+  on tests/rule_order.tftest.hcl line 37, in run "allows_are_evaluated_before_the_catch_all":
+  37:     condition = (
+  38:       azurerm_network_security_rule.allow_from_hub[0].priority <
+  39:       azurerm_network_security_rule.deny_all_inbound.priority
+  40:     )
+    ├────────────────
+    │ azurerm_network_security_rule.allow_from_hub[0].priority is 100
+    │ azurerm_network_security_rule.deny_all_inbound.priority is 100
+
+The hub allow must have a LOWER priority number than the catch-all deny, or
+Azure never evaluates it.
+  run "optional_rule_is_omitted_when_no_source_is_given"... pass
+  run "rejects_a_tier_rule_that_would_be_unreachable"... pass
+tests/rule_order.tftest.hcl... tearing down
+tests/rule_order.tftest.hcl... fail
+
+Failure! 2 passed, 2 failed.
+
+$ # restored; run again
+tests/rule_order.tftest.hcl... in progress
+  run "catch_all_deny_sits_at_the_maximum_priority"... pass
+  run "allows_are_evaluated_before_the_catch_all"... pass
+  run "optional_rule_is_omitted_when_no_source_is_given"... pass
+  run "rejects_a_tier_rule_that_would_be_unreachable"... pass
+tests/rule_order.tftest.hcl... tearing down
+tests/rule_order.tftest.hcl... pass
+
+Success! 4 passed, 0 failed.
