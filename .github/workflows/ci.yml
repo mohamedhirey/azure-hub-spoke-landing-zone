@@ -1,0 +1,63 @@
+name: ci
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+# No id-token, no Azure credentials. Nothing in this workflow can touch a cloud
+# resource. The repository is public; validation, linting and scanning do not
+# need cloud access, so they do not get it.
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  validate:
+    name: Validate and scan
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.16.0"
+
+      - name: Format check
+        run: terraform fmt -check -recursive
+
+      - name: Validate bootstrap
+        working-directory: bootstrap
+        run: |
+          terraform init -backend=false
+          terraform validate
+
+      - name: Validate workload
+        working-directory: envs/prod
+        run: |
+          terraform init -backend=false
+          terraform validate
+
+      - name: Set up TFLint
+        uses: terraform-linters/setup-tflint@v4
+        with:
+          tflint_version: latest
+
+      - name: Run TFLint
+        env:
+          GITHUB_TOKEN: ${{ github.token }} # plugin download is rate-limited without it
+        run: |
+          tflint --init
+          tflint --recursive --format compact
+
+      # Pinned to a commit, not a tag: this action's tags have been re-published
+      # upstream before, and a tag can be moved where a commit cannot.
+      - name: Trivy IaC scan
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: config
+          scan-ref: .
+          exit-code: "1"
+          severity: HIGH,CRITICAL

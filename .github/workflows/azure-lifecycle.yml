@@ -1,0 +1,116 @@
+name: azure-lifecycle
+
+# One workflow, three actions. Manual dispatch only - there is no path by which
+# a push or a pull request reaches Azure.
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "plan, apply or destroy"
+        required: true
+        type: choice
+        options: [plan, apply, destroy]
+      confirm:
+        description: "Type the action name again to confirm"
+        required: true
+        type: string
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  terraform:
+    name: ${{ inputs.action }}
+    runs-on: ubuntu-latest
+    environment: production # every run pauses here for a required reviewer
+
+    defaults:
+      run:
+        working-directory: envs/prod
+
+    env:
+      ARM_USE_OIDC: "true"
+      ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      TF_VAR_subscription_id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+    steps:
+      - name: Confirm the action
+        if: inputs.confirm != inputs.action
+        run: |
+          echo "::error::Confirmation did not match the selected action."
+          exit 1
+
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.16.0"
+
+      - name: Azure login (OIDC, no client secret)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Unit tests
+        working-directory: modules/nsg
+        run: |
+          terraform init -backend=false
+          terraform test
+
+      - name: Terraform init
+        run: |
+          terraform init \
+            -backend-config="resource_group_name=${{ secrets.TFSTATE_RG }}" \
+            -backend-config="storage_account_name=${{ secrets.TFSTATE_STORAGE_ACCOUNT }}" \
+            -backend-config="container_name=tfstate" \
+            -backend-config="key=lz.tfstate"
+
+      - name: Plan
+        if: inputs.action == 'plan'
+        run: terraform plan -input=false
+
+      - name: Apply
+        if: inputs.action == 'apply'
+        run: terraform apply -auto-approve -input=false
+
+      - name: Destroy
+        if: inputs.action == 'destroy'
+        run: terraform destroy -auto-approve -input=false
+
+      # Proves the DEPLOYED posture matches the claim - not merely that the
+      # apply exited zero. Reads live Azure, not Terraform state.
+      - name: Verify NSG posture from live Azure
+        if: inputs.action == 'apply'
+        run: |
+          set -euo pipefail
+          RG="${{ secrets.WORKLOAD_RG }}"
+          fail=0
+          for nsg in $(az network nsg list -g "$RG" --query "[].name" -o tsv); do
+            prio=$(az network nsg rule list --nsg-name "$nsg" -g "$RG" --query "max_by([], &priority).priority" -o tsv)
+            access=$(az network nsg rule list --nsg-name "$nsg" -g "$RG" --query "max_by([], &priority).access" -o tsv)
+            if [ "$prio" != "4096" ] || [ "$access" != "Deny" ]; then
+              echo "::error::$nsg - highest rule is $access at $prio, expected Deny at 4096"
+              fail=1
+            else
+              echo "OK   $nsg"
+            fi
+          done
+          exit $fail
+
+      - name: Confirm no billable resource was created
+        if: inputs.action == 'apply'
+        run: |
+          set -euo pipefail
+          RG="${{ secrets.WORKLOAD_RG }}"
+          banned=$(az resource list -g "$RG" \
+            --query "[?contains(type,'publicIPAddresses') || contains(type,'virtualMachines') || contains(type,'natGateways') || contains(type,'azureFirewalls') || contains(type,'virtualNetworkGateways')].name" -o tsv)
+          if [ -n "$banned" ]; then
+            echo "::error::Billable resource found in $RG: $banned"
+            exit 1
+          fi
+          echo "OK   no VM, public IP, NAT gateway, firewall or VPN gateway present"

@@ -1,0 +1,4 @@
+# Copy to terraform.tfvars and set your real subscription ID.
+# terraform.tfvars is gitignored and must never be committed.
+
+subscription_id = "00000000-0000-0000-0000-000000000000"
