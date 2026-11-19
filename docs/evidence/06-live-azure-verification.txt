@@ -1,0 +1,58 @@
+# Captured 2026-11-19 04:53 (UTC). Account identifiers are redacted.
+
+$ az network vnet list -g "$WLRG" --query "[].{Name:name,Cidr:addressSpace.addressPrefixes[0],Location:location}" -o table
+Name                  Cidr          Location
+--------------------  ------------  -------------
+vnet-lz-dev-cac-001   10.20.0.0/16  canadacentral
+vnet-lz-hub-cac-001   10.10.0.0/16  canadacentral
+vnet-lz-prod-cac-001  10.30.0.0/16  canadacentral
+
+$ for v in $(az network vnet list -g "$WLRG" --query "[].name" -o tsv); do az network vnet peering list --vnet-name "$v" -g "$WLRG" --query "[].{Vnet:'$v',Peering:name,State:peeringState,ForwardedTraffic:allowForwardedTraffic}" -o table; done
+Vnet                 Peering                                     State      ForwardedTraffic
+-------------------  ------------------------------------------  ---------  ------------------
+vnet-lz-dev-cac-001  vnet-lz-dev-cac-001-to-vnet-lz-hub-cac-001  Connected  False
+Vnet                 Peering                                      State      ForwardedTraffic
+-------------------  -------------------------------------------  ---------  ------------------
+vnet-lz-hub-cac-001  vnet-lz-hub-cac-001-to-vnet-lz-prod-cac-001  Connected  False
+vnet-lz-hub-cac-001  vnet-lz-hub-cac-001-to-vnet-lz-dev-cac-001   Connected  False
+Vnet                  Peering                                      State      ForwardedTraffic
+--------------------  -------------------------------------------  ---------  ------------------
+vnet-lz-prod-cac-001  vnet-lz-prod-cac-001-to-vnet-lz-hub-cac-001  Connected  False
+
+$ for n in $(az network nsg list -g "$WLRG" --query "[].name" -o tsv); do az network nsg rule list --nsg-name "$n" -g "$WLRG" --query "sort_by([],&priority)[].{Nsg:'$n',Priority:priority,Name:name,Access:access,Source:sourceAddressPrefix,Port:destinationPortRange}" -o table; done
+Nsg                          Priority    Name                 Access    Source        Port
+---------------------------  ----------  -------------------  --------  ------------  ------
+nsg-lz-dev-snet-app-cac-001  100         AllowFromHub         Allow     10.10.0.0/16  *
+nsg-lz-dev-snet-app-cac-001  200         AllowAppFromWebTier  Allow     10.20.1.0/24  8080
+nsg-lz-dev-snet-app-cac-001  4096        DenyAllInbound       Deny      *             *
+Nsg                          Priority    Name                Access    Source          Port
+---------------------------  ----------  ------------------  --------  --------------  ------
+nsg-lz-dev-snet-web-cac-001  100         AllowFromHub        Allow     10.10.0.0/16    *
+nsg-lz-dev-snet-web-cac-001  200         AllowHttpsFromVnet  Allow     VirtualNetwork  443
+nsg-lz-dev-snet-web-cac-001  4096        DenyAllInbound      Deny      *               *
+Nsg                 Priority    Name            Access    Source          Port
+------------------  ----------  --------------  --------  --------------  ------
+nsg-lz-hub-cac-001  100         AllowFromHub    Allow     VirtualNetwork  *
+nsg-lz-hub-cac-001  4096        DenyAllInbound  Deny      *               *
+Nsg                           Priority    Name            Access    Source        Port
+----------------------------  ----------  --------------  --------  ------------  ------
+nsg-lz-prod-snet-app-cac-001  100         AllowFromHub    Allow     10.10.0.0/16  *
+nsg-lz-prod-snet-app-cac-001  4096        DenyAllInbound  Deny      *             *
+
+$ for v in $(az network vnet list -g "$WLRG" --query "[].name" -o tsv); do az network vnet subnet list --vnet-name "$v" -g "$WLRG" --query "[].{Vnet:'$v',Subnet:name,Cidr:addressPrefixes[0],Nsg:networkSecurityGroup.id}" -o tsv; done | sed -E "s#/subscriptions/.*/networkSecurityGroups/##" | column -t
+vnet-lz-dev-cac-001   snet-app     10.20.2.0/24  nsg-lz-dev-snet-app-cac-001
+vnet-lz-dev-cac-001   snet-web     10.20.1.0/24  nsg-lz-dev-snet-web-cac-001
+vnet-lz-hub-cac-001   snet-shared  10.10.1.0/24  nsg-lz-hub-cac-001
+vnet-lz-prod-cac-001  snet-app     10.30.1.0/24  nsg-lz-prod-snet-app-cac-001
+
+$ az resource list -g "$WLRG" --query "[].{Name:name,Type:type}" -o table    # every top-level resource in the group
+Name                          Type
+----------------------------  ---------------------------------------
+nsg-lz-prod-snet-app-cac-001  Microsoft.Network/networkSecurityGroups
+nsg-lz-dev-snet-app-cac-001   Microsoft.Network/networkSecurityGroups
+vnet-lz-hub-cac-001           Microsoft.Network/virtualNetworks
+nsg-lz-hub-cac-001            Microsoft.Network/networkSecurityGroups
+vnet-lz-dev-cac-001           Microsoft.Network/virtualNetworks
+nsg-lz-dev-snet-web-cac-001   Microsoft.Network/networkSecurityGroups
+vnet-lz-prod-cac-001          Microsoft.Network/virtualNetworks
+
