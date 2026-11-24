@@ -1,10 +1,10 @@
 # Deployment evidence
 
-This landing zone was deployed to a real Azure subscription, verified and removed again on **19 November 2026 (UTC)**. Everything in this folder was captured during that run.
+This landing zone was deployed to a real Azure subscription, verified and removed again on **19 November 2026 (UTC)**. Everything in this folder was captured during that run. It describes release [`v1.0.0`](https://github.com/mohamedhirey/azure-hub-spoke-landing-zone/releases/tag/v1.0.0).
 
 It was the second run that day. The first found the four things listed at the end of this page, and each was corrected before this one.
 
-Subscription, tenant and client IDs, the state storage account name and public addresses are redacted. Nothing else is edited.
+Subscription, tenant and client IDs, the state storage account name and public addresses are redacted. The pipeline logs in files 04, 05 and 07 are condensed to the lines that carry the result, and each links to its full run. Nothing is altered.
 
 ## The pipeline runs
 

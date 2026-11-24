@@ -505,7 +505,7 @@ There is deliberately **no dev-to-prod peering**. That is the isolation proof: p
 
 Save the output of Steps 17 to 19 and a screenshot of each pipeline run to `docs/evidence/`: the plan, the apply with its two verification steps, and the read-back from Azure.
 
-Redact the subscription ID, tenant ID, client ID and the storage account name before committing anything. Edit nothing else.
+Redact the subscription ID, tenant ID, client ID and the storage account name before committing anything. A long pipeline log may be condensed to the lines that carry the result, with a link to its run. Alter nothing.
 
 **Done when** the captured output and the run screenshots are in `docs/evidence/`, redacted.
 
