@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 #
-# validate.sh - the full offline check. Contacts Azure only for `terraform test`,
-# which authenticates but creates nothing (command = plan).
+# validate.sh - the full offline check: fmt, validate, tflint and the unit tests.
+# Nothing here contacts Azure. The tests run against a mocked provider.
 #
 # Run from the repository root:   ./scripts/validate.sh
-#                                 ./scripts/validate.sh --no-test   (fully offline)
+#                                 ./scripts/validate.sh --no-test   (skip the unit tests)
 #
 set -euo pipefail
 
@@ -43,13 +43,6 @@ fi
 
 if [[ $RUN_TESTS -eq 1 ]]; then
   info "terraform test (modules/nsg)"
-  if ! az account show >/dev/null 2>&1; then
-    printf '\033[1;33m  !\033[0m Not signed in to Azure. Run `az login`, or pass --no-test.\n'
-    printf '      The azurerm provider authenticates during plan, so the tests need a session.\n'
-    printf '      They still create nothing.\n'
-    exit 1
-  fi
-  export ARM_SUBSCRIPTION_ID="$(az account show --query id -o tsv)"
   ( cd modules/nsg && terraform init -backend=false -no-color >/dev/null && terraform test )
 fi
 

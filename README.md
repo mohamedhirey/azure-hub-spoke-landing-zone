@@ -78,7 +78,7 @@ sequenceDiagram
     participant Azure as Azure
 
     Eng->>PR: Push branch, open PR
-    PR->>CI: fmt · validate · tflint · Trivy
+    PR->>CI: fmt · validate · unit tests · tflint · Trivy
     CI-->>PR: Green check (required to merge)
     Note over CI: No id-token, no Azure secrets.<br/>This workflow cannot touch a cloud resource.
 
@@ -123,7 +123,7 @@ Deployed to a real subscription on 19 November 2026 (UTC), verified, and removed
 | **State account reachable by identity, not by network** | GitHub-hosted runners have no fixed address, so a storage firewall default of Deny would lock the pipeline out of its own state. The scanner flags this (Trivy `AZU-0012`, critical) and the finding is accepted inline in `bootstrap/main.tf` with the reason beside it, not hidden or downgraded. Closing the network path means a private endpoint and a self-hosted runner. |
 | **OIDC federation, no client secret** | GitHub mints a short-lived token per run; Entra validates it against a federated credential whose subject is pinned to one repository *and one environment*. The repository is named by its immutable ID, so a renamed or re-created repository cannot inherit the trust. Nothing outside the approved environment can obtain a token. |
 | **`Network Contributor` at resource-group scope** | Not `Contributor` at subscription scope. The pipeline only ever touches networking inside one resource group, so that is the only thing it can do. Roles are granted the day of deployment and revoked the same day. |
-| **CI carries no Azure credentials at all** | The repository is public. Formatting, validation, linting and IaC scanning need no cloud access, so they are given none. Only manual dispatch, behind an approval gate, ever authenticates. |
+| **CI carries no Azure credentials at all** | The repository is public. Formatting, validation, unit tests, linting and IaC scanning need no cloud access, so they are given none. Only manual dispatch, behind an approval gate, ever authenticates. |
 | **Verification reads live Azure** | A green `apply` proves Terraform succeeded, not that the posture is correct. The pipeline queries Azure for every NSG's highest-priority rule and fails if it is not `Deny` at 4096 — then fails again if any VM, public IP, NAT gateway, firewall or VPN gateway is found. |
 | **`for_each` everywhere except one toggle** | `count` addresses by index, so removing a middle item shifts every later index and Terraform destroys and recreates them. `for_each` keys by a stable string. `count` appears exactly once, on a genuine 0-or-1 rule toggle. |
 | **Zero standing cost** | No compute, no public IP, no gateway, no metered service. VNets, subnets, NSGs and peerings are free to exist. The environment is torn down in the same session it is deployed. |
@@ -150,7 +150,7 @@ azure-hub-spoke-landing-zone/
 ├── modules/
 │   ├── network/                 VNet + subnets, for_each keyed by subnet name
 │   ├── nsg/                     NSG + ordered rules, with priority validation
-│   │   └── tests/rule_order.tftest.hcl    4 unit tests, plan-only
+│   │   └── tests/rule_order.tftest.hcl    4 unit tests, plan-only, mocked provider
 │   └── peering/                 Both directions of one logical peering
 │
 ├── scripts/
@@ -158,7 +158,7 @@ azure-hub-spoke-landing-zone/
 │   └── validate.sh              fmt + validate + tflint + unit tests, one command
 │
 ├── .github/workflows/
-│   ├── ci.yml                   fmt, validate, tflint, Trivy — no cloud credentials
+│   ├── ci.yml                   fmt, validate, unit tests, tflint, Trivy — no cloud credentials
 │   └── azure-lifecycle.yml      plan/apply/destroy, OIDC, approval gate, live verification
 │
 └── docs/evidence/               Captured output and screenshots from the deployment, redacted
@@ -182,14 +182,13 @@ terraform fmt -recursive
 (cd bootstrap && terraform init -backend=false && terraform validate)
 (cd envs/prod && terraform init -backend=false && terraform validate)
 
-# Run the NSG unit tests (plan-only; creates nothing)
+# Run the NSG unit tests (plan-only, against a mocked provider; no Azure account needed)
 cd modules/nsg
 terraform init -backend=false
-export ARM_SUBSCRIPTION_ID=$(az account show --query id -o tsv)
 terraform test        # expect: Success! 4 passed, 0 failed.
 ```
 
-**Requirements:** Terraform 1.9 or later (CI and the recorded deployment use 1.16), Azure CLI, GitHub CLI, and an Azure subscription, with its spending limit on where it has one.
+**Requirements:** Terraform 1.9 or later (CI and the recorded deployment use 1.16), Azure CLI, GitHub CLI, and an Azure subscription, with its spending limit on where it has one. Validation and the unit tests need only Terraform.
 
 ---
 

@@ -1,10 +1,8 @@
-# command = plan, so nothing is created in Azure. These assert against the plan
-# graph. An authenticated session is still required, because the azurerm
-# provider authenticates during plan: `az login` locally, OIDC in the pipeline.
+# These run against a mocked provider. Terraform loads azurerm for its schema
+# and its validation but never configures it, so the tests need no Azure
+# account and contact nothing. command = plan asserts against the plan only.
 
-provider "azurerm" {
-  features {}
-}
+mock_provider "azurerm" {}
 
 variables {
   nsg_name            = "nsg-unit-test"
