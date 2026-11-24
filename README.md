@@ -10,7 +10,7 @@
 A production-shaped Azure network landing zone: hub-and-spoke topology, default-deny network security groups, remote state that no storage account key can open, and a secretless OIDC deployment pipeline. Built with Terraform. Every deployment is verified against live Azure and torn down in the same session.
 
 > **Evidence status:** Deployed and verified on 19 November 2026 (UTC), then removed. No Azure resource remains.
-> The pipeline in this repository did all three: [plan](https://github.com/mohamedhirey/azure-hub-spoke-landing-zone/actions/runs/44460878382) · [apply](https://github.com/mohamedhirey/azure-hub-spoke-landing-zone/actions/runs/44461006767) · [destroy](https://github.com/mohamedhirey/azure-hub-spoke-landing-zone/actions/runs/44461612790). The captured proof is in [`docs/evidence/`](docs/evidence/README.md).
+> The pipeline in this repository did all three: [plan](https://github.com/mohamedhirey/azure-hub-spoke-landing-zone/actions/runs/44460878382) · [apply](https://github.com/mohamedhirey/azure-hub-spoke-landing-zone/actions/runs/44461006767) · [destroy](https://github.com/mohamedhirey/azure-hub-spoke-landing-zone/actions/runs/44461612790). The captured proof is in [`docs/evidence/`](docs/evidence/README.md) and describes release [`v1.0.0`](https://github.com/mohamedhirey/azure-hub-spoke-landing-zone/releases/tag/v1.0.0).
 
 **Author:** Mohamed Hirey — Azure Cloud Engineer · [linkedin.com/in/mohamedhirey](https://linkedin.com/in/mohamedhirey)
 
