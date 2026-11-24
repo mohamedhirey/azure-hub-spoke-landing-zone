@@ -345,7 +345,7 @@ gh secret set AZURE_SUBSCRIPTION_ID --body "$SUBID"
 
 Run Steps 14 to 21 in one shell session. Later steps reuse variables set by earlier ones, and re-deriving them in the middle of a teardown is how the wrong scope gets deleted.
 
-If the deployment cannot be completed, go to Step 21 and remove what exists. A complete repository with nothing deployed is a fine outcome. A partial environment that nobody can account for is not.
+If the deployment cannot be completed, go to Step 21 and remove what exists. Do not leave a partial environment in place.
 
 ---
 
