@@ -50,9 +50,9 @@ In this repo: `count` appears exactly once, on the optional hub allow rule. Ever
 
 ## Module outputs and `for_each`
 
-Module outputs are **unknown at plan time**. Terraform must know every `for_each` key before it can build the resource graph, so a module output inside a `for_each` map is a hard error.
+Terraform must know every `for_each` key at plan time, because the keys decide which instances exist. A value that is only known after apply, such as a resource ID returned by a module, cannot be a key or an element of a set passed to `for_each`. As a map *value* it is allowed.
 
-The pattern in `envs/prod/main.tf`: build the `for_each` map from *variables only* (`local.spoke_subnets`), then look module outputs up **inside the resource body**, where unknown values are fine.
+The pattern in `envs/prod/main.tf`: the keys of `local.spoke_subnets` are built from variables only, and the IDs the network and NSG modules return are looked up **inside the resource body**.
 
 ## Control plane vs data plane
 
@@ -81,7 +81,7 @@ A storage account with `shared_access_key_enabled = false` **refuses its own acc
 | CI fails on missing variables | `.tfvars` is gitignored, correctly | Set `TF_VAR_*` from secrets at job level |
 | Peering stuck at `Initiated` | Only one direction was created | Peering is two resources; the module creates both |
 | Everything blocked despite an allow rule | Deny numbered below the allow | Catch-all belongs at 4096, allows beneath it |
-| `for_each` refuses the map | An unknown value used as a map key | Keep module outputs out of the `for_each` map itself |
+| `for_each` refuses the map or set | A key that is only known after apply | Build the keys from variables. An apply-time value may be a map value, never a key or a set element |
 | `RequestDisallowedByPolicy` on your own apply | Resource missing the `Project` tag | Add it to `var.tags` |
 | `terraform test` fails to authenticate | The azurerm provider authenticates during plan | `az login` first, and export `ARM_SUBSCRIPTION_ID` |
 | Step 21 `$SAID` / `$SPOID` are empty | Shell variables die with the terminal tab | Stay in one terminal, or re-derive from `terraform output` |

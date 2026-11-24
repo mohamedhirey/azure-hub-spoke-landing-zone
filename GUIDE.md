@@ -174,7 +174,7 @@ Each file carries one or two design decisions. Confirm the code does what this t
 | `modules/nsg/variables.tf` | The `validation` block rejects, at plan time, any tier rule whose priority falls outside 101 to 4095. |
 | `modules/network/main.tf` | Subnets use `for_each`, keyed by name, so removing one does not re-index and recreate the others. |
 | `modules/peering/main.tf` | Each logical peering is two resources, one per direction. A single direction stays `Initiated` and carries no traffic. |
-| `envs/prod/main.tf` | `for_each` maps are built from variables only. Module outputs, unknown until apply, are looked up inside the resource bodies. |
+| `envs/prod/main.tf` | Every `for_each` key is built from variables, so it is known at plan time. The IDs the modules return, unknown until apply, are looked up inside the resource bodies. |
 | `envs/prod/main.tf` | There is no `azurerm_resource_group`. The workload group belongs to bootstrap, so this module cannot delete the group it deploys into. |
 
 **Done when** the code matches every row.

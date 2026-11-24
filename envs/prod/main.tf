@@ -1,10 +1,11 @@
 locals {
   # Flatten spokes x subnets into one map keyed like "dev-snet-web".
   #
-  # Everything in this map comes from var.spokes, so it is KNOWN AT PLAN TIME.
-  # Never put a module output into a map fed to for_each - module outputs are
-  # unknown until apply and Terraform refuses to build the resource graph.
-  # Look module outputs up inside the resource body instead (see below).
+  # Every key comes from var.spokes, so it is known at plan time. for_each
+  # requires that: Terraform has to know the full set of keys before it can
+  # plan the instances. Only the keys are restricted; a map value may be
+  # unknown until apply. The subnet and NSG IDs are still looked up in the
+  # resource bodies below, which keeps this map free of anything computed.
   spoke_subnets = merge([
     for spoke_key, spoke in var.spokes : {
       for subnet_key, cidr in spoke.subnets :
@@ -99,8 +100,8 @@ module "spoke_nsg" {
 resource "azurerm_subnet_network_security_group_association" "spoke" {
   for_each = local.spoke_subnets
 
-  # Module outputs are unknown at plan time. That is fine HERE, inside the
-  # resource body. It would NOT be fine inside the for_each expression above.
+  # These IDs are unknown until apply. That is fine in an argument. It would
+  # not be fine as a for_each key.
   subnet_id                 = module.spoke[each.value.spoke].subnet_ids[each.value.subnet]
   network_security_group_id = module.spoke_nsg[each.key].nsg_id
 }
