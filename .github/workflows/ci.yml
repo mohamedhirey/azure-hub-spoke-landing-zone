@@ -7,8 +7,8 @@ on:
     branches: [main]
 
 # No id-token, no Azure credentials. Nothing in this workflow can touch a cloud
-# resource. The repository is public; validation, linting and scanning do not
-# need cloud access, so they do not get it.
+# resource. The repository is public; validation, the unit tests, linting and
+# scanning do not need cloud access, so they do not get it.
 permissions:
   contents: read
 
@@ -38,6 +38,13 @@ jobs:
         run: |
           terraform init -backend=false
           terraform validate
+
+      # The tests use a mocked provider, so they run here without an Azure session.
+      - name: Unit tests
+        working-directory: modules/nsg
+        run: |
+          terraform init -backend=false
+          terraform test
 
       - name: Set up TFLint
         uses: terraform-linters/setup-tflint@v4

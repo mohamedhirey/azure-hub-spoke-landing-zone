@@ -83,7 +83,6 @@ A storage account with `shared_access_key_enabled = false` **refuses its own acc
 | Everything blocked despite an allow rule | Deny numbered below the allow | Catch-all belongs at 4096, allows beneath it |
 | `for_each` refuses the map or set | A key that is only known after apply | Build the keys from variables. An apply-time value may be a map value, never a key or a set element |
 | `RequestDisallowedByPolicy` on your own apply | Resource missing the `Project` tag | Add it to `var.tags` |
-| `terraform test` fails to authenticate | The azurerm provider authenticates during plan | `az login` first, and export `ARM_SUBSCRIPTION_ID` |
 | Step 21 `$SAID` / `$SPOID` are empty | Shell variables die with the terminal tab | Stay in one terminal, or re-derive from `terraform output` |
 
 ### Platform-specific

@@ -216,13 +216,12 @@ tflint --recursive
 ```bash
 cd modules/nsg
 terraform init -backend=false
-export ARM_SUBSCRIPTION_ID=$(az account show --query id -o tsv)
 terraform test
 ```
 
 Expect `Success! 4 passed, 0 failed.` (`./scripts/validate.sh` runs Steps 8 and 9 in one pass.)
 
-> `terraform test` needs an authenticated session, because the azurerm provider authenticates during plan. It still creates nothing: `command = plan` asserts against the plan graph only.
+> The tests run against a mocked provider. Terraform loads `azurerm` for its schema and its validation but never configures it, so no Azure session is needed and nothing is contacted. `command = plan` asserts against the plan only.
 
 A test that has never been seen failing is not a test that can be trusted. In `modules/nsg/main.tf`, change the `deny_all_inbound` priority from `4096` to `100` and run `terraform test` again. The first test must fail with the error message written for it. Restore the value and confirm 4 pass.
 
@@ -256,7 +255,7 @@ The push in Step 9 started `.github/workflows/ci.yml`. Watch it finish:
 gh run watch
 ```
 
-That workflow has no `id-token` permission and no Azure secrets. The repository is public, and validation, linting and scanning do not need cloud access, so they do not get it.
+That workflow has no `id-token` permission and no Azure secrets. The repository is public, and validation, the unit tests, linting and scanning do not need cloud access, so they do not get it.
 
 **Done when** the **Validate and scan** job is green on `main`.
 
