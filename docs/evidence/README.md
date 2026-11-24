@@ -1,6 +1,6 @@
 # Deployment evidence
 
-This landing zone was deployed to a real Azure subscription, verified and removed again on **19 November 2026 (UTC)**. Everything in this folder was captured during that run. It describes release [`v1.0.0`](https://github.com/mohamedhirey/azure-hub-spoke-landing-zone/releases/tag/v1.0.0).
+This hub-and-spoke network was deployed to a real Azure subscription, verified and removed again on **19 November 2026 (UTC)**. Everything in this folder was captured during that run. It describes release [`v1.0.0`](https://github.com/mohamedhirey/azure-hub-spoke-landing-zone/releases/tag/v1.0.0).
 
 It was the second run that day. The first found the four things listed at the end of this page, and each was corrected before this one.
 

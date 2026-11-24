@@ -4,8 +4,8 @@
 [![IaC](https://img.shields.io/badge/IaC-Terraform-blueviolet?logo=terraform&logoColor=white)](#)
 [![Cloud](https://img.shields.io/badge/Cloud-Microsoft%20Azure-0078D4?logo=microsoftazure&logoColor=white)](#)
 [![CI/CD](https://img.shields.io/badge/CI%2FCD-GitHub%20Actions%20%2B%20OIDC-2088FF?logo=githubactions&logoColor=white)](#)
-[![Security](https://img.shields.io/badge/NSG-Default%20Deny-red)](#)
-[![Cost](https://img.shields.io/badge/Standing%20cost-%240-brightgreen)](#)
+[![Security](https://img.shields.io/badge/NSG-Inbound%20default%20deny-red)](#)
+[![Cost](https://img.shields.io/badge/Standing%20charge-none-brightgreen)](#)
 
 The network layer of an Azure landing zone, in one subscription: hub-and-spoke topology, inbound default-deny network security groups, remote state that no storage account key can open, and a secretless OIDC deployment pipeline. Built with Terraform. Deployed through that pipeline, read back from live Azure and torn down in one session. [Scope](#scope) says what it covers and what it leaves out.
 
@@ -24,11 +24,11 @@ Companion project: [**Azure Secure Web App**](https://github.com/mohamedhirey/az
 A platform team is provisioning Azure networks by hand through the portal. The consequences are the ones every organisation hits in the same order:
 
 - **Configuration drift** between environments that nobody can reconstruct or explain.
-- **Accidental exposure** — a network security group with an allow rule numbered above the default deny looks correct in the portal and silently permits everything.
+- **Silent misordering** — an allow rule numbered above a catch-all deny looks correct in the portal and never matches.
 - **No audit trail.** Nobody can say who changed what, when, or why, which fails the evidence requirement in every compliance framework the business is subject to.
 - **Standing credentials.** A service principal client secret sits in CI for years because rotating it means coordinating a maintenance window.
 
-**The delivery:** the entire network topology as reviewed, tested, version-controlled code; a security posture that fails closed by construction; a deployment identity that holds no long-lived secret and no standing permission; and a verification step that reads live Azure rather than trusting Terraform's own report.
+**The delivery:** the entire network topology as version-controlled code, checked by CI on every change, with the NSG rule ordering unit-tested; an inbound posture that fails closed by rule order; a deployment identity with no client secret, whose roles were granted for the deployment and revoked the same day; and a verification step that reads live Azure rather than trusting Terraform's own report.
 
 ---
 
@@ -42,8 +42,8 @@ graph TB
         end
 
         subgraph DEV["vnet-lz-dev · 10.20.0.0/16"]
-            DW["snet-web 10.20.1.0/24<br/>443 from VNet @200<br/>DenyAllInbound @4096"]
-            DA["snet-app 10.20.2.0/24<br/>8080 from web tier @200<br/>DenyAllInbound @4096"]
+            DW["snet-web 10.20.1.0/24<br/>allow from hub @100<br/>443 from VNet @200<br/>DenyAllInbound @4096"]
+            DA["snet-app 10.20.2.0/24<br/>allow from hub @100<br/>8080 from web tier @200<br/>DenyAllInbound @4096"]
         end
 
         subgraph PROD["vnet-lz-prod · 10.30.0.0/16"]
@@ -60,9 +60,9 @@ graph TB
     style DEV fill:#3b2f0b,stroke:#facc15,color:#fefce8
 ```
 
-**Three VNets, not two.** Peering in Azure is non-transitive: `dev → hub → prod` does not route. That isolation only means something if both spokes actually exist and there is still no path between them. `allow_forwarded_traffic = false` on every peering enforces the same property at the data plane.
+**Three VNets, not two.** Peering in Azure is non-transitive: `dev → hub → prod` does not route. That isolation only means something if both spokes actually exist and there is still no path between them. `allow_forwarded_traffic = false` on every peering means a router added to the hub later would not pass traffic between the spokes unless it rewrote the source address to its own. [Scope](#scope) covers that case.
 
-**Nothing reaches Azure unvalidated.** Every module, unit test and pipeline check runs offline first, so Azure only ever sees code that has already been checked.
+**Checked before Azure sees it.** Formatting, validation, the unit tests, lint and the scan run with no cloud access on every pull request, and the deployment workflow runs the unit tests again before it plans.
 
 ---
 
@@ -118,7 +118,7 @@ sequenceDiagram
     Gate->>Azure: terraform apply
     Azure-->>Gate: 29 resources
     Gate->>Azure: Read back NSG rules and resource inventory
-    Note over Gate,Azure: Asserts DenyAllInbound at 4096 on every NSG<br/>and that no billable resource exists
+    Note over Gate,Azure: Asserts a deny at 4096 as the last custom rule on every NSG<br/>and that no VM, public IP or gateway exists
 ```
 
 ---
@@ -145,16 +145,16 @@ Deployed to a real subscription on 19 November 2026 (UTC), verified, and removed
 | Decision | Reasoning |
 |---|---|
 | **Catch-all deny at priority 4096, not 100** | Azure evaluates NSG rules lowest-number-first and stops at the first match. A deny at 100 makes every later allow unreachable — and it looks correct. At 4096, the highest priority number Azure accepts and so the last custom rule evaluated, any allow added later is evaluated first and a broken allow fails **closed**. |
-| **A `validation` block enforces that ordering** | The rule is not written in a comment and hoped for. `modules/nsg/variables.tf` rejects any tier rule numbered at or above 4096 at plan time. A unit test asserts the constraint, and a fourth test asserts that the validation itself fires. |
+| **A `validation` block enforces that ordering** | The rule is not written in a comment and hoped for. `modules/nsg/variables.tf` rejects, at plan time, any tier rule outside 101 to 4095, so a collision with the hub allow at 100 or the catch-all deny at 4096 fails in the plan, before any resource is created. One of the four unit tests asserts that the validation fires. |
 | **Bootstrap is a separate root module with local state** | If the storage account holding state were declared alongside the network, a `destroy` could delete the state file describing the destroy it is halfway through. Bootstrap owns both resource groups, so the workload module cannot reach upward and delete its own backend. This is also why no `prevent_destroy` lock is needed anywhere. |
 | **`shared_access_key_enabled = false`** | The state account refuses Shared Key authorization: its account keys, and any SAS token signed with them, do not work. Blob access is Entra ID data-plane RBAC only. That is an enforced property, not a policy document. |
 | **State account reachable by identity, not by network** | GitHub-hosted runners have no fixed address, so a storage firewall default of Deny would lock the pipeline out of its own state. The scanner flags this (Trivy `AZU-0012`, critical) and the finding is accepted inline in `bootstrap/main.tf` with the reason beside it, not hidden or downgraded. Closing the network path means a private endpoint and a self-hosted runner. |
-| **OIDC federation, no client secret** | GitHub mints a short-lived token per run; Entra validates it against a federated credential whose subject is pinned to one repository *and one environment*. The repository is named by its immutable ID, so a renamed or re-created repository cannot inherit the trust. Nothing outside the approved environment can obtain a token. |
-| **`Network Contributor` at resource-group scope** | Not `Contributor` at subscription scope. The pipeline only ever touches networking inside one resource group, so that is the only thing it can do. Roles are granted the day of deployment and revoked the same day. |
+| **OIDC federation, no client secret** | GitHub mints a short-lived token per run; Entra validates it against a federated credential whose subject is pinned to one repository *and one environment*. The repository is named by its immutable ID, so a renamed or re-created repository cannot inherit the trust. A token issued to a job outside the `production` environment is refused by Entra ID. |
+| **`Network Contributor` at resource-group scope** | Not `Contributor` at subscription scope. The pipeline only touches networking inside one resource group, so that is all it can manage. Its one other role is blob access to the state account. Both are granted the day of deployment and revoked the same day. |
 | **CI carries no Azure credentials at all** | The repository is public. Formatting, validation, unit tests, linting and IaC scanning need no cloud access, so they are given none. Only manual dispatch, behind an approval gate, ever authenticates. |
-| **Verification reads live Azure** | A green `apply` proves Terraform succeeded, not that the posture is correct. The pipeline queries Azure for every NSG's highest-priority rule and fails if it is not `Deny` at 4096 — then fails again if any VM, public IP, NAT gateway, firewall or VPN gateway is found. |
+| **Verification reads live Azure** | A green `apply` proves Terraform succeeded, not that the posture is correct. The pipeline queries Azure for the highest-numbered custom rule on every NSG and fails if it is not `Deny` at 4096 — then fails again if any VM, public IP, NAT gateway, firewall or VPN gateway is found. |
 | **`for_each` everywhere except one toggle** | `count` addresses by index, so removing a middle item shifts every later index and Terraform destroys and recreates them. `for_each` keys by a stable string. `count` appears exactly once, on a genuine 0-or-1 rule toggle. |
-| **Zero standing cost** | No compute, no public IP, no gateway, no metered service. VNets, subnets, NSGs and peerings are free to exist. The environment is torn down in the same session it is deployed. |
+| **No standing charge** | No compute, public IP or gateway. VNets, subnets, NSGs and idle peerings are free to exist. The state storage account bills per gigabyte and per transaction, which for one session is cents. Everything is torn down in the session it is deployed. |
 
 ---
 
@@ -222,7 +222,7 @@ terraform test        # expect: Success! 4 passed, 0 failed.
 
 ## What gets deployed
 
-29 Terraform resources, all free to exist:
+29 Terraform resources in the workload module, all free to exist:
 
 | Count | Resource |
 |---|---|
@@ -233,4 +233,6 @@ terraform test        # expect: Success! 4 passed, 0 failed.
 | 4 | Subnet-to-NSG associations |
 | 4 | VNet peerings — two per spoke, hub-to-spoke and spoke-to-hub |
 
-Zero virtual machines, zero public IP addresses, zero gateways, zero metered services.
+Zero virtual machines, zero public IP addresses, zero gateways.
+
+Bootstrap adds two resource groups and the state storage account, the only resource that bills in this deployment. Peerings bill per gigabyte transferred, and nothing here transfers any. The pipeline's identity, its roles and the state container are created by hand, in steps 12 to 16 of the guide.
