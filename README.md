@@ -7,7 +7,7 @@
 [![Security](https://img.shields.io/badge/NSG-Default%20Deny-red)](#)
 [![Cost](https://img.shields.io/badge/Standing%20cost-%240-brightgreen)](#)
 
-A production-shaped Azure network landing zone: hub-and-spoke topology, default-deny network security groups, remote state that no storage account key can open, and a secretless OIDC deployment pipeline. Built with Terraform. Every deployment is verified against live Azure and torn down in the same session.
+The network layer of an Azure landing zone, in one subscription: hub-and-spoke topology, inbound default-deny network security groups, remote state that no storage account key can open, and a secretless OIDC deployment pipeline. Built with Terraform. Deployed through that pipeline, read back from live Azure and torn down in one session. [Scope](#scope) says what it covers and what it leaves out.
 
 > **Evidence status:** Deployed and verified on 19 November 2026 (UTC), then removed. No Azure resource remains.
 > The pipeline in this repository did all three: [plan](https://github.com/mohamedhirey/azure-hub-spoke-landing-zone/actions/runs/44460878382) · [apply](https://github.com/mohamedhirey/azure-hub-spoke-landing-zone/actions/runs/44461006767) · [destroy](https://github.com/mohamedhirey/azure-hub-spoke-landing-zone/actions/runs/44461612790). The captured proof is in [`docs/evidence/`](docs/evidence/README.md) and describes release [`v1.0.0`](https://github.com/mohamedhirey/azure-hub-spoke-landing-zone/releases/tag/v1.0.0).
@@ -63,6 +63,33 @@ graph TB
 **Three VNets, not two.** Peering in Azure is non-transitive: `dev → hub → prod` does not route. That isolation only means something if both spokes actually exist and there is still no path between them. `allow_forwarded_traffic = false` on every peering enforces the same property at the data plane.
 
 **Nothing reaches Azure unvalidated.** Every module, unit test and pipeline check runs offline first, so Azure only ever sees code that has already been checked.
+
+---
+
+## Scope
+
+This is a hub-and-spoke network of the kind an Azure landing zone uses for connectivity, and the pipeline that deploys it. It is not a full landing zone. Microsoft's Cloud Adoption Framework describes one as a multi-subscription environment with eight design areas. This repository sits mainly in two of them, network topology and connectivity, and platform automation and DevOps. It keeps the hub and both spokes in one subscription and one resource group.
+
+| In scope | Not in scope |
+|---|---|
+| Hub-and-spoke virtual networks, subnets and peerings | Management groups, subscription design and subscription vending |
+| A deny-all inbound rule on every subnet, under explicit allows | Azure Policy, resource locks and governance beyond a naming and tagging convention |
+| Keyless remote state, and an OIDC pipeline with an approval gate | Azure Firewall, VPN or ExpressRoute gateways, Bastion, DNS, route tables and NAT in the hub |
+| A read-back from live Azure after apply, then teardown | Monitoring and security services: flow logs, diagnostic settings, Defender for Cloud, DDoS protection |
+| | Identity design beyond the pipeline's identity and the operator's role on the state account |
+| | Workloads: no virtual machine or service runs in these networks |
+
+What follows from that:
+
+- **The deny is inbound only, and it sits under broad allows.** Every spoke subnet accepts all ports from the hub's address range, and the hub subnet accepts everything from the `VirtualNetwork` tag, which includes both spokes. Outbound traffic is left at the default rules every NSG carries: allow to the virtual network, allow to the internet, deny the rest.
+- **A workload would need more than is here.** The deny at 4096 also overrides Azure's default allows for traffic inside a virtual network and for load balancer probes, so a workload would need inbound rules of its own. It would also need an outbound path and outbound restrictions: there is no NAT gateway, route table or firewall.
+- **Isolation is shown by configuration, not by traffic.** No virtual machine was deployed, so no packet was sent. The evidence is four peerings read back from Azure, none of them between the spokes, with forwarded traffic off.
+- **Dev and prod are separated in the network only.** They share a resource group, a state file and the pipeline's identity, which holds `Network Contributor` over all three networks.
+- **The hub is an empty peering point.** It holds one subnet and nothing else. Because the spokes trust its whole address range, anything placed in it later could reach both.
+- **The approval gate approves a run, not a plan.** `plan` and `apply` are separate runs, and `apply` plans again before it applies. The pipeline has created this network from nothing and destroyed it. It has not applied a change to a running network.
+- **Automated verification is two checks.** After `apply`, the pipeline confirms that the highest-numbered custom rule on every NSG is a deny at 4096, and that no VM, public IP, NAT gateway, firewall or VPN gateway exists in the workload resource group. The peerings and the rule details were read back by hand and are in the evidence.
+- **Much of the setup is done by hand.** Bootstrap is applied locally with local state. The app registration, federated credential, role assignments, state container, GitHub secrets, branch rule and approval gate are steps in the guide, not Terraform.
+- **Nobody else reviewed anything.** The deployed commit was pushed to `main` before the branch rule existed. Pull requests since then merge on a passing check with no approving review, and the person who dispatches a pipeline run also approves it.
 
 ---
 
